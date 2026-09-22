@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { LessonView } from "@/components/guide/CodingGuide";
 import { FLAT_LESSONS, GUIDE_SECTIONS } from "@/components/guide/guideContent";
+import { Markdown } from "@/components/ai/Markdown";
+import { JAVASCRIPT_FUNDAMENTALS } from "@/components/guide/javascriptFundamentals";
 
 const documentation = [
   {
@@ -22,7 +24,16 @@ const documentation = [
     description: "Our step-by-step beginner series with examples, previews, and common mistakes.",
     kind: "Mesivta guide",
     icon: FileCode2,
-    href: null,
+    href: "/docs?guide=mesivta",
+    internal: true,
+  },
+  {
+    title: "JavaScript Fundamentals",
+    description: "A numbered Mesivta series covering programming basics, JavaScript, Git, debugging, HTML, and CSS.",
+    kind: "Mesivta guide",
+    icon: Sparkles,
+    href: "/docs?guide=javascript",
+    internal: true,
   },
   {
     title: "MDN Web Docs",
@@ -30,6 +41,7 @@ const documentation = [
     kind: "Third-party reference",
     icon: Globe2,
     href: "https://developer.mozilla.org/en-US/docs/Web",
+    internal: false,
   },
   {
     title: "JavaScript.info",
@@ -37,6 +49,7 @@ const documentation = [
     kind: "Third-party tutorial",
     icon: Sparkles,
     href: "https://javascript.info/",
+    internal: false,
   },
   {
     title: "CSS-Tricks Almanac",
@@ -44,8 +57,11 @@ const documentation = [
     kind: "Third-party reference",
     icon: BookOpen,
     href: "https://css-tricks.com/almanac/",
+    internal: false,
   },
 ];
+
+const javascriptLessonCache = new Map<string, string>();
 
 export default function DocsPage() {
   return (
@@ -58,6 +74,7 @@ export default function DocsPage() {
 function DocsPageInner() {
   const searchParams = useSearchParams();
   const showMesivtaGuide = searchParams.get("guide") === "mesivta";
+  const showJavascriptGuide = searchParams.get("guide") === "javascript";
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -91,6 +108,8 @@ function DocsPageInner() {
 
       {showMesivtaGuide ? (
         <GuideReader />
+      ) : showJavascriptGuide ? (
+        <JavascriptReader />
       ) : (
         <main className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-6xl px-6 py-10">
@@ -106,15 +125,15 @@ function DocsPageInner() {
             </section>
 
             <section className="grid gap-4 md:grid-cols-2">
-              {documentation.map((doc, index) => {
+              {documentation.map((doc) => {
                 const Icon = doc.icon;
                 const content = (
                   <>
                     <div className="flex items-start justify-between gap-4">
-                      <span className={`rounded-md p-2 ${index === 0 ? "bg-accent-soft text-accent" : "bg-panel-2 text-muted"}`}>
+                      <span className={`rounded-md p-2 ${doc.internal ? "bg-accent-soft text-accent" : "bg-panel-2 text-muted"}`}>
                         <Icon className="size-5" />
                       </span>
-                      {doc.href ? (
+                      {!doc.internal ? (
                         <ExternalLink className="size-4 text-muted-2" />
                       ) : (
                         <span className="rounded-full bg-accent-soft px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-accent">
@@ -127,14 +146,14 @@ function DocsPageInner() {
                       <h2 className="mt-2 text-lg font-semibold">{doc.title}</h2>
                       <p className="mt-2 text-sm leading-6 text-muted">{doc.description}</p>
                       <span className="mt-5 inline-flex items-center gap-1.5 text-xs font-medium text-accent">
-                        {doc.href ? "Open resource" : "Open guide"}
+                        {doc.internal ? "Open guide" : "Open resource"}
                         <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
                       </span>
                     </div>
                   </>
                 );
 
-                if (doc.href) {
+                if (!doc.internal) {
                   return (
                     <a
                       key={doc.title}
@@ -149,13 +168,13 @@ function DocsPageInner() {
                 }
 
                 return (
-                  <a
+                  <Link
                     key={doc.title}
-                    href="/docs?guide=mesivta"
+                    href={doc.href}
                     className="group min-h-64 rounded-lg border border-accent/40 bg-panel p-6 text-left transition hover:-translate-y-0.5 hover:border-accent hover:bg-panel-2"
                   >
                     {content}
-                  </a>
+                  </Link>
                 );
               })}
             </section>
@@ -235,6 +254,105 @@ function GuideReader() {
         <div className="mx-auto max-w-3xl px-6 py-8">
           <LessonView lesson={selectedLesson} />
         </div>
+      </main>
+    </div>
+  );
+}
+
+function JavascriptReader() {
+  const searchParams = useSearchParams();
+  const selectedId = searchParams.get("lesson") ?? JAVASCRIPT_FUNDAMENTALS[0].id;
+  const selectedLesson = JAVASCRIPT_FUNDAMENTALS.find((lesson) => lesson.id === selectedId) ?? JAVASCRIPT_FUNDAMENTALS[0];
+  const cachedContent = javascriptLessonCache.get(selectedLesson.filename);
+  const [fetched, setFetched] = useState<{ filename: string; text: string } | null>(null);
+  const [error, setError] = useState<{ filename: string; message: string } | null>(null);
+
+  useEffect(() => {
+    if (javascriptLessonCache.has(selectedLesson.filename)) return;
+    let cancelled = false;
+    fetch(`/notes/javascript-fundamentals/${selectedLesson.filename}`)
+      .then((response) => {
+        if (!response.ok) throw new Error("This lesson could not be loaded.");
+        return response.text();
+      })
+      .then((text) => {
+        if (cancelled) return;
+        javascriptLessonCache.set(selectedLesson.filename, text);
+        setFetched({ filename: selectedLesson.filename, text });
+      })
+      .catch((reason: Error) => {
+        if (!cancelled) setError({ filename: selectedLesson.filename, message: reason.message });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedLesson.filename]);
+
+  const content = cachedContent ?? (fetched?.filename === selectedLesson.filename ? fetched.text : "");
+  const loadError = error?.filename === selectedLesson.filename ? error.message : null;
+
+  function lessonHref(id: string) {
+    return `/docs?guide=javascript&lesson=${encodeURIComponent(id)}`;
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 overflow-hidden">
+      <aside className="hidden w-72 shrink-0 overflow-y-auto border-r border-border bg-panel md:block">
+        <div className="border-b border-border px-4 py-3">
+          <a href="/docs" className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-foreground">
+            <ArrowLeft className="size-3.5" />
+            All documentation
+          </a>
+          <h2 className="mt-4 text-sm font-semibold">JavaScript Fundamentals</h2>
+          <p className="mt-1 text-xs leading-5 text-muted">17 numbered lessons from the Mesivta notes.</p>
+        </div>
+        <nav className="p-3" aria-label="JavaScript Fundamentals contents">
+          <div className="space-y-0.5">
+            {JAVASCRIPT_FUNDAMENTALS.map((lesson) => (
+              <a
+                key={lesson.id}
+                href={lessonHref(lesson.id)}
+                className={`block w-full rounded px-2 py-1.5 text-left text-xs transition ${
+                  selectedLesson.id === lesson.id
+                    ? "bg-accent-soft font-medium text-foreground"
+                    : "text-muted hover:bg-panel-2 hover:text-foreground"
+                }`}
+              >
+                <span className="mr-2 text-muted-2">{lesson.number}.</span>
+                {lesson.title}
+              </a>
+            ))}
+          </div>
+        </nav>
+      </aside>
+
+      <main className="min-w-0 flex-1 overflow-y-auto bg-editor">
+        <div className="border-b border-border bg-panel px-4 py-3 md:hidden">
+          <label htmlFor="javascript-lesson-select" className="text-xs font-medium text-muted">Choose a lesson</label>
+          <select
+            id="javascript-lesson-select"
+            value={selectedLesson.id}
+            onChange={(event) => { window.location.href = lessonHref(event.target.value); }}
+            className="mt-1.5 w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground"
+          >
+            {JAVASCRIPT_FUNDAMENTALS.map((lesson) => (
+              <option key={lesson.id} value={lesson.id}>{lesson.number}. {lesson.title}</option>
+            ))}
+          </select>
+        </div>
+        <article className="mx-auto max-w-3xl px-6 py-8">
+          <div className="mb-5 border-b border-border pb-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">Lesson {selectedLesson.number} of 17</p>
+            <h1 className="mt-2 text-2xl font-semibold">{selectedLesson.title}</h1>
+          </div>
+          {loadError ? (
+            <p className="rounded border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{loadError}</p>
+          ) : content ? (
+            <Markdown content={content} highlight={false} />
+          ) : (
+            <p className="text-sm text-muted">Loading lesson...</p>
+          )}
+        </article>
       </main>
     </div>
   );

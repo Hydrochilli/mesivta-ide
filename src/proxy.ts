@@ -23,7 +23,7 @@ export function proxy(req: NextRequest) {
   // Static + Next internals
   if (pathname.startsWith("/_next") || pathname.startsWith("/favicon")) return NextResponse.next();
   // Public static assets (files with extensions in the public/ folder)
-  if (/\.(png|jpe?g|gif|svg|webp|ico|css|js|woff2?|ttf|otf|eot|map)$/i.test(pathname)) return NextResponse.next();
+  if (/\.(png|jpe?g|gif|svg|webp|ico|css|js|md|woff2?|ttf|otf|eot|map)$/i.test(pathname)) return NextResponse.next();
 
   const token = req.cookies.get("webide_session")?.value;
   if (!token) {

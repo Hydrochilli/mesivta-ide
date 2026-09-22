@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   turbopack: {
     root,
   },
+  // Allows loading the dev server from a phone/other device on the LAN.
+  allowedDevOrigins: ["192.168.0.20"],
 };
 
 export default nextConfig;

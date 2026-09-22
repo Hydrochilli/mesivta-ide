@@ -7,14 +7,15 @@ import { CodeBlock } from "./CodeBlock";
 
 interface Props {
   content: string;
+  highlight?: boolean;
 }
 
-export function Markdown({ content }: Props) {
+export function Markdown({ content, highlight = true }: Props) {
   return (
     <div className="prose-invert max-w-none text-[13px] leading-relaxed text-foreground/90">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
+        rehypePlugins={highlight ? [[rehypeHighlight, { detect: true, ignoreMissing: true }]] : []}
         components={{
           // fenced code blocks — render via CodeBlock with copy
           pre({ children }) {
