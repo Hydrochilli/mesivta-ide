@@ -7,11 +7,6 @@ import { listFiles } from "@/lib/db/files";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const cerebras = new OpenAI({
-  apiKey: process.env.CEREBRAS_API_KEY!,
-  baseURL: "https://api.cerebras.ai/v1",
-});
-
 interface ActiveFileContext {
   name: string;
   path: string;
@@ -41,6 +36,14 @@ export async function POST(req: Request) {
   if (!body.chatId || !body.projectId || typeof body.content !== "string") {
     return NextResponse.json({ error: "chatId, projectId, content required" }, { status: 400 });
   }
+  if (!process.env.CEREBRAS_API_KEY) {
+    return NextResponse.json({ error: "CEREBRAS_API_KEY is not configured" }, { status: 503 });
+  }
+
+  const cerebras = new OpenAI({
+    apiKey: process.env.CEREBRAS_API_KEY,
+    baseURL: "https://api.cerebras.ai/v1",
+  });
 
   // 1. Persist the user's message.
   await createMessage(sess.userId, body.chatId, "user", body.content).catch(() => {});
