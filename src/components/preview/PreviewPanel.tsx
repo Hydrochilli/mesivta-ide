@@ -1,16 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RotateCw } from "lucide-react";
 import { useFileStore } from "@/stores/useFileStore";
 import { useProjectStore } from "@/stores/useProjectStore";
 import { buildPreview } from "@/lib/preview/buildPreview";
+import { useTerminalStore } from "@/stores/useTerminalStore";
 
 export function PreviewPanel() {
   const tree = useFileStore((s) => s.tree);
   const loading = useFileStore((s) => s.loading);
   const current = useProjectStore((s) => s.current);
   const [version, setVersion] = useState(0);
+  const [runFile, setRunFile] = useState<string | undefined>();
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const runRequest = useTerminalStore((s) => s.runRequest);
+  const reportOutput = useTerminalStore((s) => s.reportOutput);
+  const clearRunRequest = useTerminalStore((s) => s.clearRunRequest);
 
   // Auto-refresh: rebuild srcDoc when tree changes (debounced via effect)
   useEffect(() => {
@@ -18,7 +24,32 @@ export function PreviewPanel() {
     return () => clearTimeout(t);
   }, [tree]);
 
-  const srcDoc = useMemo(() => buildPreview(tree), [tree, version]);
+  const srcDoc = useMemo(() => buildPreview(tree, runFile), [tree, runFile, version]);
+
+  useEffect(() => {
+    if (!runRequest) return;
+    setRunFile(runRequest.filePath);
+    setVersion((v) => v + 1);
+    clearRunRequest();
+  }, [clearRunRequest, runRequest]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.source !== iframeRef.current?.contentWindow || event.data?.source !== "mesivta-preview") return;
+      if (event.data.type === "console") reportOutput(`[${event.data.level}] ${event.data.args.join(" ")}`);
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [reportOutput]);
+
+  useEffect(() => {
+    if (!runFile) return;
+    const timeout = window.setTimeout(() => {
+      reportOutput("[timeout] Preview stopped after 5 seconds.");
+      setVersion((v) => v + 1);
+    }, 5000);
+    return () => window.clearTimeout(timeout);
+  }, [reportOutput, runFile, version]);
 
   if (!current) {
     return <div className="flex h-full items-center justify-center text-xs text-muted-2">No project</div>;
@@ -38,7 +69,8 @@ export function PreviewPanel() {
   return (
     <div className="relative flex h-full flex-col bg-background">
       <iframe
-        key={version}
+        key={`${runFile ?? "preview"}-${version}`}
+        ref={iframeRef}
         sandbox="allow-scripts allow-modals"
         srcDoc={srcDoc}
         className="flex-1 border-0 bg-white"
