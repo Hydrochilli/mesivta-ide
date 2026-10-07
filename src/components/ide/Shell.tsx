@@ -11,6 +11,7 @@ import { EditorArea } from "@/components/editor/EditorArea";
 import { AssistantPanel } from "@/components/ai/AssistantPanel";
 import { DebugPanel } from "@/components/debug/DebugPanel";
 import { CodingGuide } from "@/components/guide/CodingGuide";
+import { TerminalPanel } from "./TerminalPanel";
 import { useBackgroundDebugScan } from "@/hooks/useBackgroundDebugScan";
 import type { ActivityView } from "./ActivityBar";
 
@@ -20,6 +21,7 @@ export function Shell({ onLogout }: { onLogout: () => void }) {
   const [activityView, setActivityView] = useState<ActivityView>("explorer");
   const showDebug = activityView === "debug";
   const showGuide = activityView === "guide";
+  const showTerminal = activityView === "terminal";
 
   // Keep the debug store's scan result fresh in the background so the
   // pulsing badge on the Debug activity-bar icon reflects live state.
@@ -51,6 +53,13 @@ export function Shell({ onLogout }: { onLogout: () => void }) {
             <ActivityBar active={activityView} onSelect={setActivityView} />
             <div className="h-full flex-1 overflow-hidden">
               <CodingGuide onClose={() => setActivityView("explorer")} />
+            </div>
+          </div>
+        ) : showTerminal ? (
+          <div className="flex h-full">
+            <ActivityBar active={activityView} onSelect={setActivityView} />
+            <div className="h-full flex-1 overflow-hidden">
+              <TerminalPanel />
             </div>
           </div>
         ) : showDebug ? (

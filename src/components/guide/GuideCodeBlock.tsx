@@ -23,9 +23,9 @@ export function GuideCodeBlock({ code, language }: GuideCodeBlockProps) {
 
   useEffect(() => {
     if (codeRef.current) {
-      codeRef.current.removeAttribute("data-highlighted");
       codeRef.current.className = `language-${language}`;
-      hljs.highlightElement(codeRef.current);
+      const highlighted = hljs.highlight(code, { language }).value;
+      codeRef.current.innerHTML = highlighted;
     }
   }, [code, language]);
 

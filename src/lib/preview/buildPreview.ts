@@ -4,7 +4,7 @@ import type { FileDTO } from "@/lib/api/client";
  * Build a self-contained HTML string for an iframe srcDoc by inlining
  * referenced CSS and JS from the project's file tree into the index.html.
  */
-export function buildPreview(tree: FileDTO[]): string | null {
+export function buildPreview(tree: FileDTO[], entryPath?: string): string | null {
   // flatten into a path map
   const map = new Map<string, FileDTO>();
   const byPath = new Map<string, FileDTO>();
@@ -20,6 +20,7 @@ export function buildPreview(tree: FileDTO[]): string | null {
 
   // find an index.html (prefer root)
   const index =
+    (entryPath ? byPath.get(entryPath.replace(/^\//, "")) : null) ??
     byPath.get("index.html") ??
     byPath.get("Index.html") ??
     [...byPath.entries()].find(([p]) => p.toLowerCase().endsWith("/index.html"))?.[1] ??
@@ -27,6 +28,9 @@ export function buildPreview(tree: FileDTO[]): string | null {
 
   if (!index || index.content == null) return null;
   let html = index.content;
+  if (!index.name.toLowerCase().endsWith(".html")) {
+    html = `<!doctype html><html><body><script>${index.content}</script></body></html>`;
+  }
 
   // Inline <link rel="stylesheet" href="...">
   html = html.replace(
@@ -54,7 +58,12 @@ export function buildPreview(tree: FileDTO[]): string | null {
     },
   );
 
-  return html;
+  return injectConsoleBridge(html);
+}
+
+function injectConsoleBridge(html: string): string {
+  const bridge = `<script>(function(){const send=(level,args)=>{try{parent.postMessage({source:"mesivta-preview",type:"console",level,args:args.map(a=>{try{return typeof a==="string"?a:JSON.stringify(a)}catch{return String(a)}})},"*")}catch{}};for(const level of ["log","info","warn","error"]){const original=console[level];console[level]=(...args)=>{send(level,args);original(...args)}}window.addEventListener("error",event=>send("error",[event.message]));window.addEventListener("unhandledrejection",event=>send("error",[String(event.reason)]))})()</script>`;
+  return html.includes("<head") ? html.replace(/<head[^>]*>/i, (match) => `${match}${bridge}`) : `${bridge}${html}`;
 }
 
 function resolvePath(href: string, byPath: Map<string, FileDTO>): FileDTO | null {

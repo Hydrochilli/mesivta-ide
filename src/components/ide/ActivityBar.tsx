@@ -7,6 +7,7 @@ import {
   Search,
   GitBranch,
   Settings,
+  TerminalSquare,
   type LucideIcon,
 } from "lucide-react";
 import { useDebugStore } from "@/stores/useDebugStore";
@@ -17,7 +18,8 @@ export type ActivityView =
   | "debug"
   | "search"
   | "scm"
-  | "settings";
+  | "settings"
+  | "terminal";
 
 interface ActivityItem {
   id: ActivityView;
@@ -31,6 +33,7 @@ const TOP_ITEMS: ActivityItem[] = [
   { id: "explorer", icon: Files, label: "Explorer" },
   { id: "guide", icon: BookOpen, label: "Coding Guide" },
   { id: "debug", icon: Bug, label: "Run and Debug" },
+  { id: "terminal", icon: TerminalSquare, label: "Virtual Terminal" },
 ];
 
 const BOTTOM_ITEMS: ActivityItem[] = [
